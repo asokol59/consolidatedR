@@ -1,0 +1,304 @@
+---
+title: "Attendance Report: `r format(seq(Sys.Date(), length = 2, by = '-1 month')[2], '%B %Y')`"
+author:
+  name: Adam E. Sokol
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+
+format:
+  pdf:
+    engine: xelatex
+    keep-tex: true
+    indent: false
+    include-in-header:
+      text: |
+        \pagenumbering{gobble}
+        \usepackage{graphicx}
+        \usepackage{titling}
+        \pretitle{\begin{center}\LARGE\includegraphics[width=10cm]{Student_Life_Logo.png}\par}
+        \usepackage{booktabs}
+        \usepackage{longtable}
+        \usepackage{threeparttable}
+        \usepackage{fancyhdr}
+        \usepackage{geometry}
+        \usepackage{xcolor}
+        \usepackage{float}
+        \usepackage{multirow}
+
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+\pagestyle{plain}
+\pagenumbering{arabic}
+
+```{=tex}
+\fancypagestyle{plain}{%
+\fancyhf{} % clear all header and footer fields
+\fancyhead[R]{\thepage} 
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\lfoot{Direct Questions to Adam Sokol, Director of Assessment, 
+ Department of Student Life\textemdash \hspace{0.5mm}  803-544-1349}}
+```
+
+```{=tex}
+\fancypagestyle{mylandscape}{
+\fancyhf{} 
+\fancyfoot{
+\makebox[\textwidth][r]{
+  \rlap{\hspace{.1cm}% Push out of margin by \footskip
+    \smash{
+      \raisebox{\dimexpr.5\baselineskip+\footskip+.2\textheight}{
+        \rotatebox{90}{Direct Questions to Adam Sokol, Director of Assessment, Department of Student Life\textemdash (803-544-1349) \thepage}}}}}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}}
+```
+
+\newpage
+# Introduction
+
+\noindent As part of our efforts to provide relevant, up-to-date, information in a timely manner. This report will work to update and inform offices during the semester of event attendance and other demographic information leading to more timely decision-making. 
+
+# Methodology
+
+\noindent The data is collected via Garnet Gate. Two reports are generated, one for the students and another for the events. The two files are combined based on `eventID`. Then a third (3^rd^) set of data with `Department` and `Team` fields is attached. The data is run through an R process to clean and create the columns used it this report. 
+
+The results show breakdowns for each office starting with the Russell House (RHUU) as well as each offices subgroups The Sub groups were established during the 20024-25 academic year. 
+
+# Results
+
+\noindent This section examines the overall counts of students by gender, race\textbackslash ethnicity, class standing, and by Unit Analysis.It should be noted that Student Govenment Election data is not included in this report because the data was not available at the time of this report.
+
+```{r}
+#| label: TimeConvert
+#| message: false
+#| warning: false
+#| include: false
+#| paged-print: false
+
+convertTime <- function(x){
+  Hour = (x * 24) %% 24 #For x>1, only the value after decimal will be considered
+  Minutes = (Hour %% 1) * 60
+ 
+  
+  hrs = ifelse (Hour < 10, paste("0",floor(Hour),sep = ""), as.character(floor(Hour)))
+  mins = ifelse (Minutes < 10, paste("0",floor(Minutes),sep = ""), as.character(floor(Minutes)))  
+  
+  return(paste(hrs, mins, sep = ":"))
+}
+
+
+```
+
+```{r}
+#| label: ImportCurrAY
+#| message: false
+#| warning: false
+#| include: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr", "tinytex")
+
+Clean_Event <- readRDS("RDSData/Clean_Event.rds")
+
+curr_spring <- Clean_Event %>% 
+  filter(Affiliation %in% c("STUDENT", "GRAD")) %>% 
+  dplyr::mutate(
+    Unit  = stringr::str_squish(Unit),
+    Team  = stringr::str_squish(Team),
+    Event = stringr::str_squish(Event),
+    Sex = stringr::str_squish(Sex),
+    SemMonth= month(`Start Date`)) %>% 
+  filter(Semester== "Spring 2026")
+
+totalAttend= scales::comma(nrow(curr_spring))
+uniqueAttend= scales::comma(length(unique(curr_spring$`Campus Email`)))
+# election_Cnt= scales::comma(length(which(Clean_Event$Event=="Homecoming Voting"))) Not needed in Spring semester
+
+nRow_dat <- nrow(curr_spring)
+
+curr_SPgraph <- curr_spring %>% 
+  group_by(AY, SemMonth) %>% 
+  summarize(Count=n())
+
+totalAttend= scales::comma(nrow(curr_spring))
+uniqueAttend= scales::comma(length(unique(curr_spring$`Campus Email`)))
+
+nRow_dat <- nrow(curr_spring)
+Curr_weeknum <- max(curr_spring$sem_week)
+
+#footnote1= paste("The Unknown category could be inflated due to students voting in the Homecoming elections.")
+```
+
+```{r}
+#| label: ImportPrevYear
+#| warning: false
+#| include: false
+#| paged-print: false
+
+prev_datLink <-"C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/SL Final Attendance AY2425 20260218.xlsx"
+
+prev_dat <- read.xlsx(prev_datLink, detectDates=T, sep.names= " ") 
+
+prev_spring <-   prev_dat %>% 
+  filter(Affiliation %in% c("STUDENT", "GRAD"))%>% 
+  dplyr::mutate(
+    Unit  = stringr::str_squish(Unit),
+    Team  = stringr::str_squish(Team),
+    Event = stringr::str_squish(Event),
+    Sex = stringr::str_squish(Sex),
+    SemMonth= month(`Start Date`)) %>%
+  filter(Semester_sep== "Spring", SemMonth %in% c(1:4), Unit != "FSL")
+
+prev_SPgraph <- prev_spring %>% 
+  group_by(AY,SemMonth) %>% 
+  summarize(Count=n())
+
+
+
+```
+
+\newpage
+\textbf{Figure 1.} Month-Over-Month Attendance Comparison to Last Academic Year
+```{r}
+#| label: MthMthGraph
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+library(ggplot2)
+
+Grph_dat <- rbind(prev_SPgraph, curr_SPgraph) %>%
+  mutate(SemMonth = factor(
+      SemMonth, levels = 1:4, labels = month.abb[1:4], ordered = TRUE))
+
+ggplot(data = Grph_dat, 
+       aes(x = SemMonth, y = Count, color = AY, group = AY, linetype= AY)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  labs(x = "Month",
+       y = "Attendance",
+       linetype = "Academic Year") +
+ scale_color_manual(values = c("#73000a", "black"))+
+ guides(color = "none")+
+ theme_classic(base_size = 10) +
+  theme(
+    axis.line = element_line(color = "black", linewidth = 0.8),
+    axis.ticks = element_line(color = "black", linewidth = 0.8),
+    axis.ticks.length = unit(0.2, "cm"))
+```
+
+The graph shows that there we fewer students in attendance at Student Life events as compared to last year. However, during AY2024-25 there were seveal major events that have not yet happend in AY25-26 (e.g., Cockstock was held in January in AY24-25 and will not be held unil March or later in AY25-26). The point-in-time comparisons that are given each week account for these events not being held around the same time as last year.   
+
+\raggedright\textsf{\textbf{\textit{Gender \& Race (Overall)}}}
+```{r}
+#| label: ovrllGenRaceTbl
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllGenRaceTab <- curr_spring %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% # Format percentages to 2 decimal place
+  adorn_ns(position = "front")
+  
+nrow_ovrllGenRace= nrow(ovrllGenRaceTab)
+ncols_ovrllGenRace= ncol(ovrllGenRaceTab)
+align_vec <- c("l", rep("c", ncol(ovrllGenRaceTab) - 1))
+
+kbl(ovrllGenRaceTab, booktabs = TRUE, caption = "Unique Student Interactions by Race \\& Gender", align = align_vec) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_ovrllGenRace-1, hline_after = TRUE) %>%
+  row_spec(nrow_ovrllGenRace, bold = TRUE) %>%
+  column_spec(ncols_ovrllGenRace, bold = TRUE) #%>% 
+  #footnote(symbol= footnote1)
+
+```
+
+\noindent Student Life had total of totalAttend interactions with uniqueAttend students. Notice also that the majority of our unique interactions are with female students.  
+
+\raggedright\textsf{\textbf{\textit{Class Standing (Overall)}}}
+
+\noindent Class Standing is determined by the number of course hours completed, and not by how many years students have completed. The table shows not only the breakdown by undergraduate class, but also provides counts for our professional colleges.
+
+```{r}
+#| label: Overall Class Standing Table
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ovrllClssStndTab <- curr_spring %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_clssStnd <- nrow(ovrllClssStndTab)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTab) - 1))
+
+kbl(ovrllClssStndTab,booktabs=T, linesep="",caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) #%>% 
+  #footnote(symbol= footnote1)
+
+```
+
+The most intresting piece of information here is that the Seniors are more active than the Freshman by less than one percent (\> 1\%). 
+
+\raggedright\textsf{\textbf{\textit{Total Interactions by Unit (Overall)}}}
+
+\noindent The table below shows how many total interactions occured by unit.
+
+```{r}
+#| label: ovrllUnitTab
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Total Interactions by Unit
+
+ovrllUnitTbl <- curr_spring %>% 
+  tabyl(Unit) %>% 
+  arrange(desc(n)) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_unit <- nrow(ovrllUnitTbl)
+align_vec_unit <- c("l", rep("c", ncol(ovrllUnitTbl) - 1))
+
+kable(ovrllUnitTbl, booktabs=TRUE, linesep = "" , align= align_vec_unit) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  row_spec(0, bold= T) %>% 
+  row_spec(nrow_unit-1, hline_after = T) %>% 
+  row_spec(nrow_unit, bold= T) #%>% 
+  #footnote(symbol= footnote1)
+```
+
+
+
+
+
+
+
+
+

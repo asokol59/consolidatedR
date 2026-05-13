@@ -1,0 +1,18 @@
+```{r}
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr")
+
+# Use cleaning protocol first  
+
+
+#create email list of students 
+
+Student_List <- April26 %>%
+  filter_out(Affiliation=="Faculty/Staff") %>% 
+  select(`Campus Email`) %>% 
+  distinct(`Campus Email`)
+ 
+  
+write.xlsx(Student_List,"C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/GE Monthly email lists/GEMonthly Email List Apr 2026 20260501.xlsx", overwrite = T)
+
+```

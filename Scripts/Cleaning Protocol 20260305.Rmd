@@ -1,0 +1,254 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r TimeConvert}
+
+convertTime <- function(x){
+  Hour = (x * 24) %% 24 #For x>1, only the value after decimal will be considered
+  Minutes = (Hour %% 1) * 60
+ 
+  
+  hrs = ifelse (Hour < 10, paste("0",floor(Hour),sep = ""), as.character(floor(Hour)))
+  mins = ifelse (Minutes < 10, paste("0",floor(Minutes),sep = ""), as.character(floor(Minutes)))  
+  
+  return(paste(hrs, mins, sep = ":"))
+}
+```
+
+```{r}
+
+get_semester <- function(dates) {
+  d <- as.Date(dates)
+  m <- month(d)
+  dd <- day(d)
+
+  is_fall   <- (m == 8 & dd >= 1) | m %in% 9:12
+  is_spring <- m %in% 1:3 | (m == 4 & dd <= 30)
+  is_summer <- (m == 5 & dd >= 1) | m %in% 6:7
+
+  result <- ifelse(is_fall, "Fall",
+                   ifelse(is_spring, "Spring",
+                          ifelse(is_summer, "Summer", NA_character_)))
+  result
+}
+
+
+```
+
+```{r}
+#| label: ReadIn
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr")
+
+#links
+
+studentLink <- "C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/SL Master Attendance Fall 25-Spring 26.xlsx"
+
+EventLink <-"C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/Events AY2526 Aug 1 May 31 20260511.xlsx"
+
+GreekLink <- "C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/FSL Roster_12525.xlsx"
+
+staffLink <- "C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/FacStaff Upload 20251203.xlsx"
+
+unitTeam <- "C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/Unit and Team Classification/Unit and Team List Through Spring 26 20260205.xlsx"
+
+#read in data
+
+studentEventData <-read.xlsx(studentLink, detectDates = T, sep.names=" ") %>% 
+ mutate(across(where(is.character), ~ str_trim(.x))) %>% 
+  rename("College"= `Primary School Of Enrollment`)
+
+eventData <- read.xlsx(EventLink, detectDates = T, sep.names = " ", startRow=4) 
+
+StateTab <- read.xlsx("C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/References/TBL State Codes.xlsx")
+
+unit_Team <- read.xlsx(unitTeam, sheet= "Upload", sep.names = " ") 
+
+#Read-in faculty Staff and adjust email and affiliation
+facstaff <- read.xlsx(staffLink, detectDates = T, sep.names = " ") %>%
+  mutate(Affiliation="Faculty/Staff") %>% 
+  select(Email, Affiliation)
+
+Greek_roster <- read.xlsx(GreekLink, sep.names=" ") %>% 
+  select(Email,`USC ID` ,`Code Description`)
+
+#Join and clean-up
+Event_AY<- left_join(studentEventData,eventData, by=join_by(`Event Code`==`Event ID`)) %>%  
+  left_join(.,unit_Team, by= join_by("Event Code")) %>% 
+  select(-Event) %>% 
+  rename(Event= "Event Title") %>% 
+  left_join(.,Greek_roster, by= join_by(`Campus Email`== Email, USCID==`USC ID`)) %>% 
+  mutate(`FSL Status`= coalesce(`FSL Status`, `Code Description`),
+         Semester=  paste(get_semester(`Start Date`), year(`Start Date`)),
+         across(`Events Attended`, ~as.double(.))) 
+
+rm(eventData, studentEventData, studentLink, EventLink, unit_Team, staffLink, GreekLink, Greek_roster,unitTeam) #keep things simple
+
+```
+
+```{r}
+#| label: Event Added clean
+
+# select desired rows, trim white spaces from both sides of any text entry.
+# Remove whitespace before and after any text column. 
+# Use Left join to merge the truncated FacStaff(seen as .facstaff) list 
+# to the events table; matching on email address. Use mutate_at to fill in
+# any Faculty or staff member missing an affiliation; then drop the 
+# .facstaff columns. Group the Affilations into three groups.
+# Use a series 
+# from the data and rename the Affiliation column.Several mutate at statements 
+# where used to add a "Not Applicable" to fill in the NA's. 
+# For the Faculty/Staff data all non essential columns are fill in Not Applicable
+
+faculty_domains <- c("mailbox.sc.edu", "cop.sc.edu", "poison.sc.edu",
+                     "usca.edu","uscb.edu","mozart.sc.edu","moore.sc.edu", "seoe.sc.edu")
+student_domains <- c("email.sc.edu", "email.uscupstate.edu","email.uscb.edu","email.sc.us")
+
+
+Clean_Event <- Event_AY %>% 
+  #Keep Selected columns
+select(c("Affiliation", "Campus Email", "USCID", "Events Attended", "Sex",
+  "Race", "Ethnicity", "FSL Status","Housing Facility", "International", "Transfer", 
+  "Athlete", "Athletic Participation","Current Term Enrolled", "Current Term GPA",
+  "Career Level", "Class Standing", "College", 
+  "Degree Sought","Major","Minor", "Home City","Home State Province",
+  "Home Country","In-State","Event Code","First-gen","Cohort","Unit", "Team","Event", "Categories",
+  "Start Date", "Start Time", "End Date", "Semester")) %>% 
+  #remove extra spaces in all character variables 
+mutate(across(where(is.character), ~str_squish(.x)), 
+      #convert email to all lower case
+      across(all_of("Campus Email"),~ str_to_lower(.x)), 
+      #fix variations and inconsistencies in Race variable
+      across(all_of("Race"), ~case_when(is.na(.)| .==""| .== "Unknown" ~ "Race / Ethnicity Unknown",
+                                  str_starts(.,"Asian")~ "Asian",
+                                  TRUE~.)), 
+      #fix variations and inconsistencies in Sex variable
+      across(Sex, ~case_when(is.na(.)|.=="" |.=="Undisclosed"~"Unknown",
+                                 TRUE ~ .)),
+      #Fill in Blanks
+      across(Ethnicity,~ifelse(is.na(.)|.=="","Unknown",.)),
+      across(`Degree Sought`,~ifelse(is.na(.)|.=="","No Degree",.)),
+      across(Major, ~ifelse(is.na(.)|.=="","No Major",.)),
+      across(Minor, ~ifelse(is.na(.)|.=="","No Minor",.)),
+      across(Transfer,~ifelse(is.na(.),"Non-Transfer", "Transfer")),
+      across(International, ~ifelse(is.na(.)|.=="","Domestic","International")),
+      across(Athlete, ~ifelse(is.na(.)|.=="","Non-Athlete","Athlete")),  
+      across(`Athletic Participation`,~ifelse(is.na(.)|.=="","Not Athlete",.)),
+      across(`Current Term Enrolled`, ~ifelse(is.na(.)|.=="","Unknown",.)),
+      across(`Career Level`, ~ifelse(is.na(.)|.=="", "Unknown",.)),
+      across(`Class Standing`, ~ifelse(is.na(.)|.=="","Unknown",.)),
+      across(`Current Term Enrolled`, ~ifelse(. %in% list("No Hours","Error Calculating Time Status") |.=="",
+                                              "Unknown",.)),
+      across(`Home City`, ~ifelse(str_detect(`Home City`,"^\\s*\\d*\\.?\\d+\\s*$")|is.na(.)|.=="", "Unknown",.)),
+     
+      # fix Current term GPA
+      `Current Term GPA` = if_else(is.na(as.numeric(`Current Term GPA`)) | 
+        as.numeric(`Current Term GPA`) == 0,NA_real_,
+        as.numeric(`Current Term GPA`)),
+      
+      # Separate FSL Status into greek_org and Membership status
+      FSL_clean= str_to_lower(`FSL Status`),
+      GreekStatus= case_when(
+        str_detect(FSL_clean, "\\binactive\\b") ~ "Inactive",
+        str_detect(FSL_clean, "\\bactive\\b") ~ "Active",
+        str_detect(FSL_clean, "new\\s*memb") ~ "New Member",
+        str_detect(FSL_clean, "probation") ~ "Probation",
+        str_detect(FSL_clean, "study\\s*abroad") ~ "Study Abroad",
+        TRUE ~ "Not Greek"),
+      Greek_Org = str_trim(str_remove(
+      FSL_clean,"\\binactive\\b|\\bactive\\b|new\\s*memb\\w*|probation\\w*|study\\s*abroad")),
+      across(Greek_Org,~ ifelse(is.na(.) | . == "", "Not Greek", str_to_title(.))),
+      FSLyn= ifelse(is.na(`FSL Status`), "No","Yes"),
+      
+      #Housing Facility cleaning and establish On_Off_Campus Variable
+      across(`Housing Facility`, ~ifelse(is.na(.)|.=="","Off-Campus",.)),
+      On_Off_Campus= ifelse(is.na(`Housing Facility`)|`Housing Facility`=="","Off-Campus","On-Campus"),
+      Area_Building= case_when(str_detect(`Housing Facility`, "^HS.*")~ "Horseshoe",
+        str_detect(`Housing Facility`,"^650.*")~"650 Lincoln",
+        str_detect(`Housing Facility`,"^Bates.*")~ "Bates House",
+        str_detect(`Housing Facility`,"^Campus.*")~ "Campus Village",
+        str_detect(`Housing Facility`,"^Green Quad.*") ~ "Green Quad",
+        str_detect(`Housing Facility`, "^McBryde.*") ~ "McBryde",
+        str_detect(`Housing Facility`, "^Womens Quad.*") ~ "Womens Quad",
+        TRUE~ `Housing Facility`),
+      
+      #fix abbreviated names in College and fill-in missing 
+      across(College, ~case_when(. %in% list("College of Engr & Computing", "Molinaroli College of Engineer")~ "Molinaroli College of Engineering and Computing",
+                                 . %in% list("College of Arts and Sciences", "McCausland College of Arts and")~ "McCausland College of Arts and Sciences",
+             is.na(.) |.=="" ~"No College Designated",
+             TRUE~.)),
+      
+      #Home State
+      across(`Home State Province`,
+      ~ case_when(.x == "FC" ~ "Not Reported",
+        .x == "ON" ~ "Ontario",
+        .x == "BC" ~ "British Columbia",
+        .x %in% StateTab$Abbv ~ StateTab$State[match(.x, StateTab$Abbv)],
+        is.na(.x)|.x==""~ "Unknown",
+        TRUE ~ .x)),
+      
+      #Home Country
+      across(`Home Country`, ~case_when(is.na(.) & `Home State Province` %in% StateTab$State~ "United States",
+                                        is.na(.)~ "Unknown",
+                                        TRUE~ .)),
+      
+      #First Gen
+       across(`First-gen`, ~case_when(.=="N"~ "No",
+                                     .=="Y"~ "First-Gen",
+                                     is.na(.)| .==" "~ "Unknown",
+                                     TRUE~ "Unknown")),
+      
+      #rework cohort variable
+       Cohort = as.numeric(Cohort),
+       Cohort = case_when(is.na(Cohort) ~ "Unknown",
+          Cohort < max(Cohort, na.rm = TRUE) - 600 ~ "Else",
+          TRUE ~ as.character(Cohort)),
+      
+      #Remove dashes from Team
+      across(Team, ~case_when(.== "Carolina-Clemson Blood Drive"~ "Carolina Clemson Blood Drive", TRUE~.)),
+      
+      #Academic Year and Semester
+      Semester_sep= get_semester(`Start Date`), 
+         CalYr_sep= year(`Start Date`),
+      across("CalYr_sep", ~as.numeric(.)),
+      AY= case_when(str_detect(Semester_sep,"[fF].*")==T ~ 
+                   paste0("AY", CalYr_sep,"-",(CalYr_sep-2000)+1),
+                 str_detect(Semester_sep,"[sS][pP].*")==T~ 
+                   paste0("AY", CalYr_sep-1,"-",(CalYr_sep-2000)),
+                 str_detect(Semester_sep,"[sS][uU].*")==T~ 
+                   paste0("AY", CalYr_sep-1, "-",(CalYr_sep-2000))),
+    across(`Start Time`, ~convertTime(`Start Time`))) %>% 
+  
+  #Join facStaff Data to fix error in Affiliation  
+  left_join(., facstaff, by=join_by("Campus Email"== "Email"), 
+            suffix=c(".event", ".facStaff")) %>% 
+  mutate(across(where(is.character), ~str_trim(.x,side="both")),
+    Affiliation.event = case_when(
+      !is.na(Affiliation.facStaff) ~ "Faculty/Staff",
+      is.na(Affiliation.facStaff) & `Class Standing` == "Graduate" ~ "GRAD",
+      is.na(Affiliation.event) & str_detect(`Campus Email`,
+        paste0("@(", paste(student_domains, collapse = "|"), ")$")) ~ "STUDENT",
+      is.na(Affiliation.event) & str_detect(
+        `Campus Email`, paste0("@(", paste(faculty_domains, collapse = "|"), ")$")) ~ "Faculty/Staff",
+      is.na(Affiliation.event) | Affiliation.event == "" ~ "Unknown",
+      TRUE ~ Affiliation.event)) %>% 
+  select(-c(Affiliation.facStaff)) %>% 
+  rename("Affiliation"= Affiliation.event) %>% 
+  select(-c("FSL Status", "FSL_clean")) %>% 
+  distinct(`Campus Email`,`Event Code`,.keep_all=T)
+ 
+
+#if using data in another script remove every thing you don't need
+rm(eventData, Event_AY, facstaff, Greek_roster, StateTab, studentEventData, unit_Team)
+
+# Save RDS
+dir.create("RDSData", showWarnings = FALSE)
+saveRDS(Clean_Event, "RDSData/Clean_Event.rds")
+
+# write data to excel 
+write.xlsx(Clean_Event,"C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/Master Lists/AY2526 Student Data 20260512.xlsx", overwrite=T)
+
+```

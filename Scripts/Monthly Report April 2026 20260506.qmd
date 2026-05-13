@@ -1,0 +1,2640 @@
+---
+title: "Attendance Report: `r format(seq(Sys.Date(), length = 2, by = '-1 month')[2], '%B %Y')`"
+author:
+  name: Adam E. Sokol
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+
+format:
+  pdf:
+    engine: xelatex
+    keep-tex: true
+    indent: false
+    include-in-header:
+      text: |
+        \pagenumbering{gobble}
+        \usepackage{graphicx}
+        \usepackage{titling}
+        \pretitle{\begin{center}\LARGE\includegraphics[width=10cm]{Student_Life_Logo.png}\par}
+        \usepackage{booktabs}
+        \usepackage{longtable}
+        \usepackage{threeparttable}
+        \usepackage{fancyhdr}
+        \usepackage{geometry}
+        \usepackage{xcolor}
+        \usepackage{float}
+        \usepackage{placeins}
+        \usepackage{multirow}
+         \makeatletter
+        \setlength{\@fptop}{0pt}
+        \setlength{\@fpsep}{8pt}
+        \setlength{\@fpbot}{0pt}
+        \makeatother
+        \renewcommand{\topfraction}{.95}
+        \renewcommand{\textfraction}{.05}
+        \renewcommand{\floatpagefraction}{.8}
+        \setcounter{topnumber}{3}
+        \setcounter{totalnumber}{5}
+
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+```{=tex}
+\fancypagestyle{plain}{%
+\fancyhf{} % clear all header and footer fields
+\fancyhead[R]{\thepage} 
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\lfoot{Direct Questions to Adam Sokol, Director of Assessment, 
+ Department of Student Life\textemdash \hspace{0.5mm}  803-544-1349}}
+```
+
+```{=tex}
+\fancypagestyle{mylandscape}{
+\fancyhf{} 
+\fancyfoot{
+\makebox[\textwidth][r]{
+  \rlap{\hspace{.1cm}% Push out of margin by \footskip
+    \smash{
+      \raisebox{\dimexpr.5\baselineskip+\footskip+.2\textheight}{
+        \rotatebox{90}{Direct Questions to Adam Sokol, Director of Assessment, Department of Student Life\textemdash (803-544-1349) \thepage}}}}}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}}
+```
+
+\newpage
+
+\FloatBarrier
+\pagestyle{plain}
+\pagenumbering{arabic}
+
+# Introduction
+
+\noindent As part of our efforts to provide relevant, up-to-date, information in a timely manner. This report will work to update and inform offices during the semester of event attendance and other demographic information. 
+
+<!-- Reasons Better Decisions Making -->
+
+# Methodology
+
+\noindent The data is collected via Garnet Gate. Two reports are generated, one for the students and another for the events. The two files are combined based on `eventID`. Then a third (3^rd^) set of data with `Department` and `Team` fields is attached. The data is run through an R process to clean and create the columns used it this report. 
+
+The results show breakdowns for each office starting with the Russell House (RHUU) as well as each offices subgroups The Sub groups were established during the 20024-25 academic year.  
+
+# Results
+
+## Student Life Overall
+
+\noindent This section examines the overall counts of students by gender, race\textbackslash ethnicity, college, class standing, transfer, and first-generation status.
+
+\noindent This section examines the overall demographic information. These numbers \textbf{exclude} faculty/staff attendees. It should be noted that Student Govenment Election data is not included in this report because the data was not available at the time of this report.
+
+```{r}
+#| label: Import
+#| message: false
+#| warning: false
+#| include: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+datLink <- readRDS("RDSData/Clean_Event.rds")
+
+Clean_Event <-  datLink%>% 
+  filter(Affiliation %in% c("STUDENT", "GRAD")) %>% 
+  dplyr::mutate(
+    Unit  = stringr::str_squish(Unit),
+    Team  = stringr::str_squish(Team),
+    Event = stringr::str_squish(Event),
+    Sex = stringr::str_squish(Sex)) %>%
+  rename("FirstGen"= "First-gen") %>%
+  filter(Semester== "Spring 2026")
+
+totalAttend= scales::comma(nrow(Clean_Event))
+uniqueAttend= scales::comma(length(unique(Clean_Event$`Campus Email`)))
+# election_Cnt= scales::comma(length(which(Clean_Event$Event=="Homecoming Voting"))) Not needed in Spring semester
+
+nRow_dat <- nrow(Clean_Event)
+
+#footnote1= paste("The Unknown category could be inflated due to students voting in the Homecoming elections.")
+
+```
+
+```{r}
+#| label: ovrllGenRaceTbl
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| cache: true
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllGenRaceTab <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(.,Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% # Format percentages to 1 decimal place
+  adorn_ns(position = "front")
+  
+nrow_ovrllGenRace= nrow(ovrllGenRaceTab)
+ncols_ovrllGenRace= ncol(ovrllGenRaceTab)
+align_vec <- c("l", rep("c", ncol(ovrllGenRaceTab) - 1))
+
+kbl(ovrllGenRaceTab, booktabs = TRUE, caption = "Unique Student Interactions by Race \\& Gender", align = align_vec) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_ovrllGenRace-1, hline_after = TRUE) %>%
+  row_spec(nrow_ovrllGenRace, bold = TRUE) %>%
+  column_spec(ncols_ovrllGenRace, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+```
+
+\noindent Student Life had total of `r totalAttend` interactions with `r uniqueAttend` students. Notice also that the majority of our unique interactions are with female students. Next we will examine which colleges have the most attendees at our events. 
+
+```{r}
+#| label: Overall College Table
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllCollegeTab_manual <- Clean_Event %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  count(College, name = "Count") %>%           # numeric counts
+  arrange(desc(Count)) %>%
+  mutate(
+    GrandTotal = sum(Count, na.rm = TRUE),
+    `Percentage(%)` = round(Count / GrandTotal * 100, 2)
+  ) %>%
+  # add totals row
+  bind_rows(
+    tibble(
+      College = "Total",
+      Count = sum(.$Count),
+      GrandTotal = NA_real_,
+      `Percentage(%)` = 100
+    )
+  ) %>%
+  select(-GrandTotal) %>%
+  # formatting for display
+  mutate(
+    Count = comma(Count),
+    `Percentage(%)` = paste0(formatC(`Percentage(%)`, format = "f", digits = 2), "%")
+  )
+
+nrows_college <- nrow(ovrllCollegeTab_manual)
+
+align_vec_college <- c("l", rep("c", ncol(ovrllCollegeTab_manual) - 1))
+
+kbl(ovrllCollegeTab_manual,booktabs=T,caption= "Unique Student Interactions by College", align= align_vec_college) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10, full_width = F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_college-1,hline_after = T) %>% 
+  row_spec(nrows_college, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\noindent Class Standing is determined by the number of course hours completed, and not by how many years students have completed. The table shows not only the breakdown by undergraduate class, but also provides counts for our professional colleges.
+
+```{r}
+#| label: Overall Class Standing Table
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ovrllClssStndTab <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>% 
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_clssStnd <- nrow(ovrllClssStndTab)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTab) - 1))
+
+kbl(ovrllClssStndTab,booktabs=T, longtable=T, linesep="",caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) 
+  #footnote(symbol= footnote1)
+
+```
+
+The most intresting piece of information here is that the Seniors are more active than the Freshman.
+
+\noindent Since many students begin their college carrers with some college credits through early enrollment, AP courses in High School, these students may be considered Sophmores or Juniors which can skew the numbers. Inspecting the data through the lens of what cohort they fall in with can deliver additional information.     
+
+```{r}
+#| label: OvrllChrtTbl
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ovrllCohortTbl <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Cohort!= "Unknown") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  filter(Cohort != "Missing") %>% 
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+  
+CohortYr_missing <- Clean_Event %>% 
+  filter(Cohort== "Unknown") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(ovrllCohortTbl,booktabs=T, longtable = T,linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2019-20 were also removed."), threeparttable= T)
+
+```
+
+```{r}
+#| label: CrteTrnsfr
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Unique Interactions by Transfer Status
+
+ovrllTrnsfrTab <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_Trnsfr <- nrow(ovrllTrnsfrTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(ovrllTrnsfrTab) - 1))
+
+kbl(ovrllTrnsfrTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position","scale_down")) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_Trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_Trnsfr, bold= T) 
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGen
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status"
+
+ovrll1stGenTab <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+nrow_FrstGen <- nrow(ovrll1stGenTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(ovrll1stGenTab) - 1))
+
+kbl(ovrll1stGenTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position","scale_down")) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGen-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGen, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\newpage
+\raggedright\textsf{\textbf{\textit{Total Interactions by Unit (Overall)}}}
+\noindent The table below shows how many total interactions occured by unit.
+
+```{r}
+#| label: ovrllUnitTab
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Total Interactions by Unit
+
+ovrllUnitTbl <- Clean_Event %>% 
+  tabyl(Unit) %>% 
+  arrange(desc(n)) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_unit <- nrow(ovrllUnitTbl)
+align_vec_unit <- c("l", rep("c", ncol(ovrllUnitTbl) - 1))
+
+kable(ovrllUnitTbl, booktabs=TRUE, linesep = "" , align= align_vec_unit) %>% 
+  kable_styling(latex_options = "hold_position") %>% 
+  row_spec(0, bold= T) %>% 
+  row_spec(nrow_unit-1, hline_after = T) %>% 
+  row_spec(nrow_unit, bold= T)  
+  #footnote(symbol= footnote1)
+```
+\FloatBarrier
+
+\newpage
+## Gamecock Entertainment (GE)
+This section begins the breakdown by departments. Provides unique counts and percentages by office. Gamecock Entertainment (RHUU) is the largest host of students in the Department of Student Life. This covers a wide range of events Gamecock Entertainment and their subsidiaries, Carolina Productions, Dance Marathon, and Homecoming, Takeover Tuesday,Thursday After Dark.  
+
+```{r}
+#| label: RaceGenGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabGE <- Clean_Event %>% 
+  filter(Unit=="GE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_GE <- nrow(GenRaceTabGE)
+ncol_GE <- ncol(GenRaceTabGE)
+align_vec_GE <- c("l", rep("c", ncol(GenRaceTabGE) - 1))
+
+kbl(GenRaceTabGE, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender", align = align_vec_GE) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_GE-1, hline_after = TRUE) %>%
+  row_spec(nrow_GE, bold = TRUE) %>%
+  column_spec(ncol_GE, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabGE_cnt <- Clean_Event %>% 
+  filter(Unit=="GE")
+ 
+nrowUnit_GE_written <- scales::comma(nrow(GenRaceTabGE_cnt))
+nrowUnit_GE_numeric <- nrow(GenRaceTabGE_cnt)
+
+GE_pct <- paste0(format((nrowUnit_GE_numeric/nRow_dat * 100), digits=4), "%")
+
+totalEvents_UnitTeams <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit, Team) %>% 
+  summarize(Count= n(), .groups = "drop") %>% 
+  arrange()
+
+TotalEvents_Unit <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit) %>% 
+  summarize(Count=n())
+
+numGE_events <- TotalEvents_Unit %>% 
+  dplyr::filter(Unit== "GE") %>% 
+  dplyr::pull(Count)
+```
+Gamecock Entertainment as a whole accounted for `{r} nrowUnit_GE_written` total student interactions making up `{r} GE_pct` of the total student engagements, hosting `{r} numGE_events` events. These tables show theat the majority of attendees are White Females.
+
+```{r}
+#| label: CollegeTabGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabGE <- Clean_Event %>% 
+  filter(Unit == "GE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+nrows_collegeGE <- nrow(CollegeTabGE)
+
+align_vec_collegeGE <- c("l", rep("c", ncol(CollegeTabGE) - 1))
+
+kbl(CollegeTabGE,booktabs=T, caption= "Unique Student Interactions by College", align= align_vec_collegeGE) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeGE-1,hline_after = T) %>% 
+  row_spec(nrows_collegeGE, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ClssStndUtGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllClssStndTabGE <- Clean_Event %>% 
+  filter(Unit=="GE") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent,) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+
+nrow_clssStnd <- nrow(ovrllClssStndTabGE)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabGE) - 1))
+
+kbl(ovrllClssStndTabGE,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd, ) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+```
+
+```{r}
+#| label: ChrtTblGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblGE <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Unit== "GE",Cohort!= "Unknown") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  filter(Cohort != "Missing") %>% 
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Unit== "GE", Cohort== "Unknown") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(CohortTblGE)
+align_vec_clssstnd <- c("l", rep("c", ncol(CohortTblGE) - 1))
+
+kbl(CohortTblGE, booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = "hold_position", font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2019-20 were also removed."), threeparttable = TRUE)
+
+```
+
+```{r}
+#| label: CrteTrnsfrGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Unique Interactions by Transfer Status
+
+  TrnsfrTabGE <- Clean_Event %>% 
+  filter(Unit== "GE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabGE)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabGE) - 1))
+
+kbl(TrnsfrTabGE, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status"
+
+  GE1stGenTab <- Clean_Event %>% 
+  filter(Unit== "GE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`FirstGen`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGen <- nrow(GE1stGenTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(GE1stGenTab) - 1))
+
+kbl(GE1stGenTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGen-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGen, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\FloatBarrier
+
+\newpage
+### Carolina Productions (CP)
+```{r}
+#| label: RaceGenCP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabCP <- Clean_Event %>% 
+  filter(Team=="Carolina Productions") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_CP <- nrow(GenRaceTabCP)
+ncol_CP <- ncol(GenRaceTabCP)
+align_vec_CP <- c("l", rep("c", ncol(GenRaceTabCP) - 1))
+
+kbl(GenRaceTabCP, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Carolina Productions)", align = align_vec_CP) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_CP-1, hline_after = TRUE) %>%
+  row_spec(nrow_CP, bold = TRUE) %>%
+  column_spec(ncol_CP, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabCP_cnt <- Clean_Event %>% 
+  filter(Team=="Carolina Productions")
+ 
+nrowUnit_CP_written <- scales::comma(nrow(GenRaceTabCP_cnt))
+nrowUnit_CP_numeric <- nrow(GenRaceTabCP_cnt)
+
+CP_pct <- paste0(format((nrowUnit_CP_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesCP <- Clean_Event %>%
+  filter(str_detect(Team, "Carolina Productions")) %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+
+```{r}
+#| label: CollegeTabCP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabCP <- Clean_Event %>% 
+  filter(Team == "Carolina Productions") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+  
+
+nrows_collegeCP <- nrow(CollegeTabCP)
+
+align_vec_collegeCP <- c("l", rep("c", ncol(CollegeTabCP) - 1))
+
+kbl(CollegeTabCP,booktabs=T, longtable = T, caption= "Unique Student Interactions by College (Team: Carolina Productions)", align= align_vec_collegeCP) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeCP-1,hline_after = T) %>% 
+  row_spec(nrows_collegeCP, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ClssStnd_CP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ClssStndTabCP <- Clean_Event %>% 
+  filter(Team=="Carolina Productions") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2)
+  
+nrow_clssStnd <- nrow(ClssStndTabCP)
+align_vec_clssstnd <- c("l", rep("c", ncol(ClssStndTabCP) - 1))
+
+kbl(ClssStndTabCP,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Carolina Productions)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblCP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblCP <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Carolina Productions",Cohort!= "Unknown") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  filter( Cohort != "Missing") %>% 
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+  
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Carolina Productions",Cohort== "Unknown") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblCP,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = "Students with cohort years before AY2019-20 were removed.", threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrCP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Carolina Productions)"
+
+  TrnsfrTabCP <- Clean_Event %>% 
+  filter(Team== "Carolina Productions") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabCP)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabCP) - 1))
+
+kbl(TrnsfrTabCP, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenCP
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Carolina Productions)"
+
+  CP1stGenTab <- Clean_Event %>% 
+  filter(Team== "Carolina Productions") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_FrstGenCP <- nrow(CP1stGenTab)
+align_vec_FirstGenCP <- c("l", rep("c", ncol(CP1stGenTab) - 1))
+
+kbl(CP1stGenTab, booktabs=T, align= align_vec_FirstGenCP) %>% 
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenCP-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenCP, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\FloatBarrier
+### Carolina-Clemson Blood Drive (CCBD)
+```{r}
+#| label: RaceGenCCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabCCBD <- Clean_Event %>% 
+  filter(Team=="Carolina Clemson Blood Drive") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_CCBD <- nrow(GenRaceTabCCBD)
+ncol_CCBD <- ncol(GenRaceTabCCBD)
+align_vec_CCBD <- c("l", rep("c", ncol(GenRaceTabCCBD) - 1))
+
+kbl(GenRaceTabCCBD, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Carolina Clemson Blood Drive)", align = align_vec_CCBD) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_CCBD-1, hline_after = TRUE) %>%
+  row_spec(nrow_CCBD, bold = TRUE) %>%
+  column_spec(ncol_CCBD, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabCCBD_cnt <- Clean_Event %>% 
+  filter(Team=="Carolina Clemson Blood Drive")
+ 
+nrowUnit_CCBD_written <- scales::comma(nrow(GenRaceTabCCBD_cnt))
+nrowUnit_CCBD_numeric <- nrow(GenRaceTabCCBD_cnt)
+
+CCBD_pct <- paste0(format((nrowUnit_CCBD_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesCCBD <- Clean_Event %>%
+  filter(str_detect(Team, "Carolina Clemson Blood Drive")) %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+
+```{r}
+#| label: CollegeTabCCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabCCBD <- Clean_Event %>% 
+  filter(Team == "Carolina Clemson Blood Drive") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+  
+nrows_collegeCCBD <- nrow(CollegeTabCCBD)
+
+align_vec_collegeCCBD <- c("l", rep("c", ncol(CollegeTabCCBD) - 1))
+
+kbl(CollegeTabCCBD,booktabs=T, longtable = T, caption= "Unique Student Interactions by College (Team: Carolina Clemson Blood Drive)", align= align_vec_collegeCCBD) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeCCBD-1,hline_after = T) %>% 
+  row_spec(nrows_collegeCCBD, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ClssStnd_CCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ClssStndTabCCBD <- Clean_Event %>% 
+  filter(Team=="Carolina Clemson Blood Drive") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2)
+  
+
+nrow_clssStnd <- nrow(ClssStndTabCCBD)
+align_vec_clssstnd <- c("l", rep("c", ncol(ClssStndTabCCBD) - 1))
+
+kbl(ClssStndTabCCBD,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Carolina Clemson Blood Drive)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblCCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblCCBD <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Carolina Clemson Blood Drive", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+  
+CohortCCBD_missing <- Clean_Event %>% 
+  filter(Team== "Carolina Clemson Blood Drive", Cohort== "Unknown") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(CohortTblCCBD)
+align_vec_clssstnd <- c("l", rep("c", ncol(CohortTblCCBD) - 1))
+
+kbl(CohortTblCCBD,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort (Team: Carolina Clemson Blood Drive)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = "Students with cohort years before AY2019-20 were removed.", threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrCCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Carolina Clemson Blood Drive)"
+
+TrnsfrTabCCBD <- Clean_Event %>% 
+  filter(Team== "Carolina Clemson Blood Drive") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabCCBD)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabCCBD) - 1))
+
+kbl(TrnsfrTabCCBD, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenCCBD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Carolina Clemson Blood Drive)"
+
+CCBD1stGenTab <- Clean_Event %>% 
+  filter(Team== "Carolina Clemson Blood Drive") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_FrstGenCCBD <- nrow(CCBD1stGenTab)
+align_vec_FirstGenCCBD <- c("l", rep("c", ncol(CCBD1stGenTab) - 1))
+
+kbl(CCBD1stGenTab, booktabs=T, align= align_vec_FirstGenCCBD) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenCCBD-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenCCBD, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\FloatBarrier
+### Dance Marathon (USCDM)
+```{r}
+#| label: RaceGenUSCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabUSCDM <- Clean_Event %>%
+  filter(Team == "Dance Marathon") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>%
+  arrange(desc(Female)) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("all") %>%
+  adorn_pct_formatting(digits = 2) %>%
+  adorn_ns(position = "front")
+
+nrow_USCDM <- nrow(GenRaceTabUSCDM)
+ncol_USCDM <- ncol(GenRaceTabUSCDM)
+align_vec_USCDM <- c("l", rep("c", ncol(GenRaceTabUSCDM) - 1))
+
+GenRaceTabUSCDM <- Clean_Event %>%
+  filter(Team == "Dance Marathon") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>%
+  arrange(desc(Female)) %>%
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("all") %>%
+  adorn_pct_formatting(digits = 2) %>%
+  adorn_ns(position = "front")
+
+kbl(GenRaceTabUSCDM, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Dance Marathon)", align = align_vec_USCDM) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_USCDM-1, hline_after = TRUE) %>%
+  row_spec(nrow_USCDM, bold = TRUE) %>%
+  column_spec(ncol_USCDM, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabUSCDM_cnt <- Clean_Event %>% 
+  filter(Team=="Dance Marathon")
+ 
+nrowUnit_USCDM_written <- scales::comma(nrow(GenRaceTabUSCDM_cnt))
+nrowUnit_USCDM_numeric <- nrow(GenRaceTabUSCDM_cnt)
+
+USCDM_pct <- paste0(format((nrowUnit_USCDM_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesUSCDM <- Clean_Event %>%
+  filter(Team== "Dance Marathon") %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+
+```{r}
+#| label: CollegeTabUSCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabUSCDM <- Clean_Event %>% 
+  filter(Team == "Dance Marathon") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrows_collegeUSCDM <- nrow(CollegeTabUSCDM)
+
+align_vec_collegeUSCDM <- c("l", rep("c", ncol(CollegeTabUSCDM) - 1))
+
+kbl(CollegeTabUSCDM,booktabs=T, longtable=T, caption= "Unique Student Interactions by College (Team: Dance Marathon)", align= align_vec_collegeUSCDM) %>%
+  kable_styling(latex_options = c("hold_position","scale_down", "repeat_header"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeUSCDM-1,hline_after = T) %>% 
+  row_spec(nrows_collegeUSCDM, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: OvrllClssStnd_USCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+
+ovrllClssStndTabUSCDM <- Clean_Event %>% 
+  filter(Team=="Dance Marathon") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_clssStnd <- nrow(ovrllClssStndTabUSCDM)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabUSCDM) - 1))
+
+kbl(ovrllClssStndTabUSCDM,booktabs=T, longtable = T,linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Dance Marathon)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblUSCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblUSCDM <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Dance Marathon",Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+  
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Dance Marathon", Cohort== "Unknown") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(CohortTblUSCDM)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblUSCDM,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general =  "Students with cohort years before AY2020-21 were also removed.", threeparttable= T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrUSCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Dance Marathon)"
+
+  TrnsfrTabUSCDM <- Clean_Event %>% 
+  filter(Team== "Dance Marathon") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabUSCDM)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabUSCDM) - 1))
+
+kbl(TrnsfrTabUSCDM, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenUSCDM
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Dance Marathon)"
+
+  USCDM1stGenTab <- Clean_Event %>% 
+  filter(Team== "Dance Marathon") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGenUSCDM <- nrow(USCDM1stGenTab)
+align_vec_FirstGenUSCDM <- c("l", rep("c", ncol(USCDM1stGenTab) - 1))
+
+kbl(USCDM1stGenTab, booktabs=T, align= align_vec_FirstGenUSCDM) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenUSCDM-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenUSCDM, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\FloatBarrier
+### Gamecock Entertainment (Team)
+This section looks at Gamecock Entertainment as a Team. This area covers all signature events, such as Midnight Breakfast and Tiger Burn, as well as other events that do not fit within the other subsections of GE.  
+
+```{r}
+#| label: RaceGenTmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabTmGE <- Clean_Event %>% 
+  filter(Team=="Gamecock Entertainment") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(.)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_TmGE <- nrow(GenRaceTabTmGE)
+ncol_TmGE <- ncol(GenRaceTabTmGE)
+align_vec_TmGE <- c("l", rep("c", ncol(GenRaceTabTmGE) - 1))
+
+kbl(GenRaceTabTmGE, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Gamecock Entertainment)", align = align_vec_TmGE) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_TmGE-1, hline_after = TRUE) %>%
+  row_spec(nrow_TmGE, bold = TRUE) %>%
+  column_spec(ncol_TmGE, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabTmGE_cnt <- Clean_Event %>% 
+  filter(Team=="Gamecock Entertainment")
+ 
+nrowUnit_TmGE_written <- scales::comma(nrow(GenRaceTabTmGE_cnt))
+nrowUnit_TmGE_numeric <- nrow(GenRaceTabTmGE_cnt)
+
+TmGE_pct <- paste0(format((nrowUnit_TmGE_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesTmGE <- Clean_Event %>%
+  filter(str_detect(Team, "Gamecock Entertainment")) %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+
+```{r}
+#| label: CollegeTabTmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabTmGE <- Clean_Event %>% 
+  filter(Team == "Gamecock Entertainment") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrows_collegeTmGE <- nrow(CollegeTabTmGE)
+
+align_vec_collegeTmGE <- c("l", rep("c", ncol(CollegeTabTmGE) - 1))
+
+kbl(CollegeTabTmGE, booktabs=T, longtable=T, caption= "Unique Student Interactions by College (Team: Gamecock Entertainment)", align= align_vec_collegeTmGE) %>%
+  kable_styling(latex_options = c("hold_position","scale_down", "repeat_header"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeTmGE-1,hline_after = T) %>% 
+  row_spec(nrows_collegeTmGE, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: OvrllClssStnd_TmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+
+ovrllClssStndTabTmGE <- Clean_Event %>% 
+  filter(Team=="Gamecock Entertainment") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_clssStnd <- nrow(ovrllClssStndTabTmGE)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabTmGE) - 1))
+
+kbl(ovrllClssStndTabTmGE,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Gamecock Entertainment)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblTmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblGE <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Gamecock Entertainment", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Gamecock Entertainment",Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblGE,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable=T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrTmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Gamecock Entertainment)"
+
+  TrnsfrTabTmGE <- Clean_Event %>% 
+  filter(Team== "Gamecock Entertainment") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabTmGE)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabTmGE) - 1))
+
+kbl(TrnsfrTabTmGE, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenTmGE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Gamecock Entertainment)"
+
+  TmGE1stGenTab <- Clean_Event %>% 
+  filter(Team== "Gamecock Entertainment") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_FrstGenTmGE <- nrow(TmGE1stGenTab)
+align_vec_FirstGenTmGE <- c("l", rep("c", ncol(TmGE1stGenTab) - 1))
+
+kbl(TmGE1stGenTab, booktabs=T, align= align_vec_FirstGenTmGE) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenTmGE-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenTmGE, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\clearpage
+\FloatBarrier
+### Live \@ the Underground
+```{r}
+#| label: RaceGenLiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabLiveUnd <- Clean_Event %>% 
+  filter(Team=="Live at the Underground") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(.)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_LiveUnd <- nrow(GenRaceTabLiveUnd)
+ncol_LiveUnd <- ncol(GenRaceTabLiveUnd)
+align_vec_LiveUnd <- c("l", rep("c", ncol_LiveUnd - 1))
+
+kbl(GenRaceTabLiveUnd, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Live @ the Underground)", align = align_vec_LiveUnd) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_LiveUnd-1, hline_after = TRUE) %>%
+  row_spec(nrow_LiveUnd, bold = TRUE) %>%
+  column_spec(ncol_LiveUnd, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabLiveUnd_cnt <- Clean_Event %>% 
+  filter(Team=="Live at the Underground")
+ 
+nrowUnit_LiveUnd_written <- scales::comma(nrow(GenRaceTabLiveUnd_cnt))
+nrowUnit_LiveUnd_numeric <- nrow(GenRaceTabLiveUnd_cnt)
+
+LiveUnd_pct <- paste0(format((nrowUnit_LiveUnd_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesLiveUnd <- Clean_Event %>%
+  filter(str_detect(Team, "Live at the Underground")) %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+\FloatBarrier
+```{r}
+#| label: CollegeTabLiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabLiveUnd <- Clean_Event %>% 
+  filter(Team =="Live at the Underground") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrows_collegeLiveUnd <- nrow(CollegeTabLiveUnd)
+align_vec_collegeLiveUnd <- c("l", rep("c", ncol(CollegeTabLiveUnd) - 1))
+
+kbl(CollegeTabLiveUnd,booktabs=T, longtable=T, caption= "Unique Student Interactions by College (Team: Live @ the Underground)", align= align_vec_collegeLiveUnd) %>%
+  kable_styling(latex_options = c("scale_down", "repeat_header"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeLiveUnd-1,hline_after = T) %>% 
+  row_spec(nrows_collegeLiveUnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: OvrllClssStnd_LiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+
+ovrllClssStndTabLiveUnd <- Clean_Event %>% 
+  filter(Team=="Live at the Underground") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_clssStnd <- nrow(ovrllClssStndTabLiveUnd)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabLiveUnd) - 1))
+
+kbl(ovrllClssStndTabLiveUnd,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Live @ the Underground)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblLiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblLiveUnd <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Live at the Underground", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Live at the Underground", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblLiveUnd,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+\FloatBarrier
+```{r}
+#| label: CrteTrnsfrLiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Live \\@ the Underground)"
+
+  TrnsfrTabLiveUnd <- Clean_Event %>% 
+  filter(Team == "Live at the Underground" ) %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabLiveUnd)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabLiveUnd) - 1))
+
+kbl(TrnsfrTabLiveUnd, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = "scale_down", position="center", full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenLiveUnd
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Live \\@ the Underground)"
+
+  LiveUnd1stGenTab <- Clean_Event %>% 
+  filter(Team== "Live at the Underground") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent, ) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_FrstGenLiveUnd <- nrow(LiveUnd1stGenTab)
+align_vec_FirstGenLiveUnd <- c("l", rep("c", ncol(LiveUnd1stGenTab) - 1))
+
+kbl(LiveUnd1stGenTab, booktabs=T, align= align_vec_FirstGenLiveUnd) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenLiveUnd-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenLiveUnd, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\FloatBarrier
+### Thursday After Dark (TAD) 
+```{r}
+#| label: RaceGenTAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabTAD <- Clean_Event %>% 
+  filter(Team=="Thursday After Dark") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(.)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_TAD <- nrow(GenRaceTabTAD)
+ncol_TAD <- ncol(GenRaceTabTAD)
+align_vec_TAD <- c("l", rep("c", ncol(GenRaceTabTAD) - 1))
+
+kbl(GenRaceTabTAD, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Thursday After Dark)", align = align_vec_TAD) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_TAD-1, hline_after = TRUE) %>%
+  row_spec(nrow_TAD, bold = TRUE) %>%
+  column_spec(ncol_TAD, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: CollegeTabTAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabTAD <- Clean_Event %>% 
+  filter(Team == "Thursday After Dark") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrows_collegeTAD <- nrow(CollegeTabTAD)
+align_vec_collegeTAD <- c("l", rep("c", ncol(CollegeTabTAD) - 1))
+
+kbl(CollegeTabTAD,booktabs=T, longtable=T, caption= "Unique Student Interactions by College (Team: Thursday After Dark)", align= align_vec_collegeTAD) %>%
+  kable_styling(latex_options = c("hold_position","scale_down", "repeat_header"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeTAD-1,hline_after = T) %>% 
+  row_spec(nrows_collegeTAD, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ClssStnd_TAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ClssStndTabTAD <- Clean_Event %>% 
+  filter(Team=="Thursday After Dark") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_clssStnd <- nrow(ClssStndTabTAD)
+align_vec_clssstnd <- c("l", rep("c", ncol(ClssStndTabTAD) - 1))
+
+kbl(ClssStndTabTAD,booktabs=T, longtable = T,linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Thursday After Dark)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblTAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ChrtTblTAD <-  Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Live at the Underground", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Live at the Underground", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ChrtTblTAD)
+align_vec_clssstnd <- c("l", rep("c", ncol(ChrtTblTAD) - 1))
+
+kbl(ChrtTblTAD,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrTAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team: Thursday After Dark)"
+
+  TrnsfrTabTAD <- Clean_Event %>% 
+  filter(Team== "Thursday After Dark") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabTAD)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabTAD) - 1))
+
+kbl(TrnsfrTabTAD, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenTAD
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team: Thursday After Dark)"
+
+  TAD1stGenTab <- Clean_Event %>% 
+  filter(Team== "Thursday After Dark") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGenTAD <- nrow(TAD1stGenTab)
+align_vec_FirstGenTAD <- c("l", rep("c", ncol(TAD1stGenTab) - 1))
+
+kbl(TAD1stGenTab, booktabs=T, align= align_vec_FirstGenTAD) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenTAD-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenTAD, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\FloatBarrier
+\newpage
+### Tuesday Takeover (TT)
+
+```{r}
+#| label: RaceGenTT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabTT <- Clean_Event %>% 
+  filter(Team=="Tuesday Takeover") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_TT <- nrow(GenRaceTabTT)
+ncol_TT <- ncol(GenRaceTabTT)
+align_vec_TT <- c("l", rep("c", ncol(GenRaceTabTT) - 1))
+
+kbl(GenRaceTabTT, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender (Team: Tuesday Takeover)", align = align_vec_TT) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_TT-1, hline_after = TRUE) %>%
+  row_spec(nrow_TT, bold = TRUE) %>%
+  column_spec(ncol_TT, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabTT_cnt <- Clean_Event %>% 
+  filter(Team=="Homecoming")
+ 
+nrowUnit_TT_written <- scales::comma(nrow(GenRaceTabTT_cnt))
+nrowUnit_TT_numeric <- nrow(GenRaceTabTT_cnt)
+
+TT_pct <- paste0(format((nrowUnit_TT_numeric/nRow_dat * 100), digits=4), "%")
+
+num_duplicate_addressesTT <- Clean_Event %>%
+  filter(str_detect(Team, "Tuesday Takeover")) %>%
+  count(`Campus Email`) %>%
+  filter(n > 1) %>%
+  nrow()
+
+```
+
+```{r}
+#| label: CollegeTabTT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabTT <- Clean_Event %>% 
+  filter(Team == "Tuesday Takeover") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrows_collegeTT <- nrow(CollegeTabTT)
+
+align_vec_collegeTT <- c("l", rep("c", ncol(CollegeTabTT) - 1))
+
+kbl(CollegeTabTT,booktabs=T, longtable=T, caption= "Unique Student Interactions by College (Team: Tuesday Takeover)", align= align_vec_collegeTT) %>%
+  kable_styling(latex_options = c("hold_position","scale_down", "repeat_header"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeTT-1,hline_after = T) %>% 
+  row_spec(nrows_collegeTT, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: OvrllClssStnd_TT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+ovrllClssStndTabTT <- Clean_Event %>% 
+  filter(Team=="Tuesday Takeover") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_clssStnd <- nrow(ovrllClssStndTabTT)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabTT) - 1))
+
+kbl(ovrllClssStndTabTT,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing (Team: Tuesday Takeover)", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: ChrtTblTT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblTT <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Team== "Tuesday Takeover", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Team== "Tuesday Takeover", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(CohortTblTT)
+align_vec_clssstnd <- c("l", rep("c", ncol(CohortTblTT) - 1))
+
+kbl(CohortTblTT,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrTT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status (Team\\: Tuesday Takeover)"
+
+  TrnsfrTabTT <- Clean_Event %>% 
+  filter(Team== "Tuesday Takeover") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabTT)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabTT) - 1))
+
+kbl(TrnsfrTabTT, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenTT
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status (Team\\: Tuesday Takeover)"
+
+  TT1stGenTab <- Clean_Event %>% 
+  filter(Team== "Tuesday Takeover") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+
+nrow_FrstGenTT <- nrow(TT1stGenTab)
+align_vec_FirstGenTT <- c("l", rep("c", ncol(TT1stGenTab) - 1))
+
+kbl(TT1stGenTab, booktabs=T, align= align_vec_FirstGenTT) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGenTT-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGenTT, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\FloatBarrier
+## Leadership and Service Center (LSC)
+```{r}
+#| label: RaceGenLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabLSC <- Clean_Event %>% 
+  filter(Unit=="LSC") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_LSC <- nrow(GenRaceTabLSC)
+ncol_LSC <- ncol(GenRaceTabLSC)
+align_vec_LSC <- c("l", rep("c", ncol(GenRaceTabLSC) - 1))
+
+kbl(GenRaceTabLSC, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender", align = align_vec_LSC) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_LSC-1, hline_after = TRUE) %>%
+  row_spec(nrow_LSC, bold = TRUE) %>%
+  column_spec(ncol_LSC, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabLSC_cnt <- Clean_Event %>% 
+  filter(Unit=="LSC")
+ 
+nrowUnit_LSC_written <- scales::comma(nrow(GenRaceTabLSC_cnt))
+nrowUnit_LSC_numeric <- nrow(GenRaceTabLSC_cnt)
+
+LSC_pct <- paste0(format((nrowUnit_LSC_numeric/nRow_dat * 100), digits=4), "%")
+
+totalEvents_UnitTeams <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit, Team) %>% 
+  summarize(Count= n(), .groups = "drop") %>% 
+  arrange()
+
+TotalEvents_Unit <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit) %>% 
+  summarize(Count=n())
+
+numLSC_events <- TotalEvents_Unit %>% 
+  dplyr::filter(Unit== "LSC") %>% 
+  dplyr::pull(Count)
+```
+
+The Leadership and Service Center as a whole accounted for `{r} nrowUnit_LSC_written` total student interactions making up `{r} LSC_pct` of the total student engagements, hosting `{r} numLSC_events` events. These tables show theat the majority of attendees are White Females. 
+
+```{r}
+#| label: CollegeTabLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabLSC <- Clean_Event %>% 
+  filter(Unit == "LSC") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+nrows_collegeLSC <- nrow(CollegeTabLSC)
+
+align_vec_collegeLSC <- c("l", rep("c", ncol(CollegeTabLSC) - 1))
+
+kbl(CollegeTabLSC,booktabs=T, longtable= T, caption= "Unique Student Interactions by College", align= align_vec_collegeGE) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeLSC-1,hline_after = T) %>% 
+  row_spec(nrows_collegeLSC, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: OvrllClssStndLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllClssStndTabLSC <- Clean_Event %>% 
+  filter(Unit=="LSC") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+  
+nrow_clssStnd <- nrow(ovrllClssStndTabLSC)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabLSC) - 1))
+
+kbl(ovrllClssStndTabLSC,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+```
+
+```{r}
+#| label: ChrtTblLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblLSC <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Unit== "LSC", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Unit== "LSC", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(CohortTblLSC)
+align_vec_clssstnd <- c("l", rep("c", ncol(CohortTblLSC) - 1))
+
+kbl(CohortTblLSC,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by Transfer Status"
+
+  TrnsfrTabLSC <- Clean_Event %>% 
+  filter(Unit== "LSC") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabLSC)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabLSC) - 1))
+
+kbl(TrnsfrTabLSC, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenLSC
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status"
+
+  LSC1stGenTab <- Clean_Event %>% 
+  filter(Unit== "LSC") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGen <- nrow(LSC1stGenTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(LSC1stGenTab) - 1))
+
+kbl(LSC1stGenTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGen-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGen, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\clearpage
+\FloatBarrier
+## Center for Student Engagement (CSE)
+```{r}
+#| label: RaceGenCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabCSE <- Clean_Event %>% 
+  filter(Unit=="CSE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_CSE <- nrow(GenRaceTabCSE)
+ncol_CSE <- ncol(GenRaceTabCSE)
+align_vec_CSE <- c("l", rep("c", ncol(GenRaceTabCSE) - 1))
+
+kbl(GenRaceTabCSE, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender", align = align_vec_CSE) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_CSE-1, hline_after = TRUE) %>%
+  row_spec(nrow_CSE, bold = TRUE) %>%
+  column_spec(ncol_CSE, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabCSE_cnt <- Clean_Event %>% 
+  filter(Unit=="CSE")
+ 
+nrowUnit_CSE_written <- scales::comma(nrow(GenRaceTabCSE_cnt))
+nrowUnit_CSE_numeric <- nrow(GenRaceTabCSE_cnt)
+
+CSE_pct <- paste0(format((nrowUnit_CSE_numeric/nRow_dat * 100), digits=4), "%")
+
+totalEvents_UnitTeams <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit, Team) %>% 
+  summarize(Count= n(), .groups = "drop") %>% 
+  arrange()
+
+TotalEvents_Unit <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit) %>% 
+  summarize(Count=n())
+
+numCSE_events <- TotalEvents_Unit %>% 
+  dplyr::filter(Unit== "CSE") %>% 
+  dplyr::pull(Count)
+```
+
+The Leadership and Service Center as a whole accounted for `{r} nrowUnit_CSE_written` total student interactions making up `{r} CSE_pct` of the total student engagements, hosting `{r} numLSC_events` events. These tables show theat the majority of attendees are Black Females. 
+
+\FloatBarrier
+```{r}
+#| label: CollegeTabCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabCSE <- Clean_Event %>% 
+  filter(Unit == "CSE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+nrows_collegeCSE <- nrow(CollegeTabCSE)
+align_vec_collegeCSE <- c("l", rep("c", ncol(CollegeTabCSE) - 1))
+
+kbl(CollegeTabCSE, booktabs=T, longtable = T, caption= "Unique Student Interactions by College", align= align_vec_collegeCSE) %>%
+  kable_styling(latex_options = "scale_down", font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeCSE-1,hline_after = T) %>% 
+  row_spec(nrows_collegeCSE, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\clearpage
+\FloatBarrier
+```{r}
+#| label: OvrllClssStndCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllClssStndTabCSE <- Clean_Event %>% 
+  filter(Unit=="CSE") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+  
+nrow_clssStnd <- nrow(ovrllClssStndTabCSE)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabCSE) - 1))
+
+kbl(ovrllClssStndTabCSE,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = "scale_down", font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+```
+
+```{r}
+#| label: ChrtTblCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblCSE <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Unit== "CSE", Cohort!= c("Unknown","Missing")) %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Unit== "CSE", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblCSE,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Unique Interactions by Transfer Status
+
+  TrnsfrTabCSE <- Clean_Event %>% 
+  filter(Unit== "CSE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabCSE)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabCSE) - 1))
+
+kbl(TrnsfrTabCSE, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenCSE
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status"
+
+  CSE1stGenTab <- Clean_Event %>% 
+  filter(Unit== "CSE") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGen <- nrow(CSE1stGenTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(CSE1stGenTab) - 1))
+
+kbl(CSE1stGenTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGen-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGen, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+\FloatBarrier
+
+## Student Governance (StuGov)
+```{r}
+#| label: RaceGenStuGov
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+GenRaceTabSG <- Clean_Event %>% 
+  filter(Unit=="SG") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(Race, Sex) %>% 
+  arrange(desc(Female)) %>% 
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("all") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+nrow_SG <- nrow(GenRaceTabSG)
+ncol_SG <- ncol(GenRaceTabSG)
+align_vec_SG <- c("l", rep("c", ncol(GenRaceTabSG) - 1))
+
+kbl(GenRaceTabSG, booktabs = TRUE, caption = "Unique Student Interactions by Race and Gender", align = align_vec_SG) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  row_spec(0, bold = TRUE) %>%
+  row_spec(nrow_SG-1, hline_after = TRUE) %>%
+  row_spec(nrow_SG, bold = TRUE) %>%
+  column_spec(ncol_SG, bold = TRUE)  
+  #footnote(symbol= footnote1)
+
+GenRaceTabSG_cnt <- Clean_Event %>% 
+  filter(Unit=="SG")
+ 
+nrowUnit_SG_written <- scales::comma(nrow(GenRaceTabSG_cnt))
+nrowUnit_SG_numeric <- nrow(GenRaceTabSG_cnt)
+
+SG_pct <- paste0(format((nrowUnit_SG_numeric/nRow_dat * 100), digits=4), "%")
+
+totalEvents_UnitTeams <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit, Team) %>% 
+  summarize(Count= n(), .groups = "drop") %>% 
+  arrange()
+
+TotalEvents_Unit <- unique(Clean_Event[,c("Unit", "Team", "Event")]) %>% 
+  group_by(Unit) %>% 
+  summarize(Count=n())
+
+numSG_events <- TotalEvents_Unit %>% 
+  dplyr::filter(Unit== "SG") %>% 
+  dplyr::pull(Count)
+```
+
+The Leadership and Service Center as a whole accounted for `{r} nrowUnit_SG_written` total student interactions making up `{r} SG_pct` of the total student engagements, hosting `{r} numLSC_events` events. These tables show theat the majority of attendees are White Females. 
+
+\FloatBarrier
+```{r}
+#| label: CollegeTabSG
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CollegeTabSG <- Clean_Event %>% 
+  filter(Unit == "SG") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(College) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+  
+nrows_collegeSG <- nrow(CollegeTabSG)
+align_vec_collegeSG <- c("l", rep("c", ncol(CollegeTabSG) - 1))
+
+kbl(CollegeTabSG, booktabs=T, longtable = T, caption= "Unique Student Interactions by College", align= align_vec_collegeSG) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrows_collegeSG-1,hline_after = T) %>% 
+  row_spec(nrows_collegeSG, bold=T)  
+  #footnote(symbol= footnote1)
+
+```
+
+\clearpage
+\FloatBarrier
+```{r}
+#| label: OvrllClssStndSG
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+pacman::p_load("tidyverse", "janitor", "lubridate","stringr","forcats", "openxlsx", "tidyr","kableExtra", "scales", "knitr")
+
+ovrllClssStndTabSG <- Clean_Event %>% 
+  filter(Unit=="SG") %>%
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(`Class Standing`) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(`Percentage(%)`)) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.))) 
+  
+nrow_clssStnd <- nrow(ovrllClssStndTabSG)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllClssStndTabSG) - 1))
+
+kbl(ovrllClssStndTabSG,booktabs=T, linesep = "", caption= "Unique Student Interactions by Class Standing", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T)  
+  #footnote(symbol= footnote1)
+```
+
+```{r}
+#| label: ChrtTblSG
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+
+CohortTblSG <- Clean_Event %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  filter(Unit== "SG", Cohort!= "Missing") %>% 
+  tabyl(`Cohort`) %>% 
+  rename("Count" = n, "Percentage(%)" = percent) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 6) %>% 
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  mutate(across(Count, ~ comma(.))) 
+   
+CohortYr_missing <- Clean_Event %>% 
+  filter(Unit== "SG", Cohort== "Missing") %>% 
+  nrow(.) %>% 
+  comma(.)
+  
+nrow_clssStnd <- nrow(ovrllCohortTbl)
+align_vec_clssstnd <- c("l", rep("c", ncol(ovrllCohortTbl) - 1))
+
+kbl(CohortTblTT,booktabs=T, linesep="",caption= "Unique Student Interactions by Cohort", align=align_vec_clssstnd) %>%
+  kable_styling(latex_options = c("hold_position","scale_down"), font_size = 10) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_clssStnd-1,hline_after = T) %>% 
+  row_spec(nrow_clssStnd, bold=T) %>% 
+  footnote(general = paste0("There are ", CohortYr_missing, " students with missing cohort data. Students with cohort years before AY2020-21 were also removed."), threeparttable = T)
+
+```
+
+```{r}
+#| label: CrteTrnsfrSG
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: Unique Interactions by Transfer Status
+
+  TrnsfrTabSG <- Clean_Event %>% 
+  filter(Unit== "SG") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>% 
+  tabyl(Transfer) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_trnsfr <- nrow(TrnsfrTabSG)
+align_vec_trnsfr <- c("l", rep("c", ncol(TrnsfrTabSG) - 1))
+
+kbl(TrnsfrTabSG, booktabs=T, align= align_vec_trnsfr) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_trnsfr-1,hline_after = T) %>% 
+  row_spec(nrow_trnsfr, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+```{r}
+#| label: FirstGenSG
+#| echo: false
+#| message: false
+#| warning: false
+#| paged-print: false
+#| tbl-cap: "Unique Interactions by First-Generation Status"
+
+  SG1stGenTab <- Clean_Event %>% 
+  filter(Unit== "SG") %>% 
+  distinct(`Campus Email`, .keep_all = TRUE) %>%
+  tabyl(FirstGen) %>% 
+  rename("Count"= n, "Percentage(%)"=percent) %>%
+  arrange(desc(Count)) %>%  
+  adorn_totals("row") %>% 
+  adorn_pct_formatting(,digits=2) %>% 
+  mutate(across(Count, ~comma(.)))
+
+nrow_FrstGen <- nrow(SG1stGenTab)
+align_vec_trnsfer <- c("l", rep("c", ncol(SG1stGenTab) - 1))
+
+kbl(SG1stGenTab, booktabs=T, align= align_vec_trnsfer) %>% 
+  kable_styling(latex_options = c("hold_position", "scale_down"), full_width= F) %>% 
+  row_spec(0, bold=T) %>% 
+  row_spec(nrow_FrstGen-1,hline_after = T) %>% 
+  row_spec(nrow_FrstGen, bold= T)  
+  #footnote(symbol= footnote1)
+
+```
+
+
+
+

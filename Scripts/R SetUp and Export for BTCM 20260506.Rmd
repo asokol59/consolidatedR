@@ -1,0 +1,183 @@
+```{r}
+#| label: BTCM Nonsense
+#| message: true
+#| warning: true
+#| include: false
+#| paged-print: true
+
+
+# Load packages
+
+pacman::p_load("tidyverse", "janitor", "lubridate", "stringr", "forcats", "openxlsx", "tidyr", "fs", "readxl", "writexl")
+
+# --- Helper formatters ---
+# export: stable legacy format (dash-separated, four-digit year)
+fmt_export <- function(x) {
+  x_date <- as.Date(x)
+  format(x_date, "%m-%d-%Y")
+}
+
+# display: requested format with zero-padded day (safe for parsing back to Date)
+# results like "12/05/25"
+fmt_display <- function(x, pad_day = TRUE) {
+  x_date <- as.Date(x)
+  mm <- format(x_date, "%m")
+  dd <- if (pad_day) format(x_date, "%d") else sub("^0", "", format(x_date, "%d"))
+  yy <- format(x_date, "%y")
+  paste0(mm, "/", dd, "/", yy)
+}
+
+#find first date and last date of previous month
+first_day_last_month <- floor_date(today(), unit="month") - months(1)
+last_day_last_month <- floor_date(today(), unit="month")-days(1) 
+
+
+# Output paths
+out_dir <- "C:/Users/asokol/OneDrive - University of South Carolina/StudentLife/Data/BTCM Events Data/BTCM Event Data Project/AY2526 uploads/April 2026"
+fs::dir_create(out_dir)
+
+Events_add <- readRDS("RDSData/Clean_Event.rds")
+
+# --- Prep Events_add (parse dates, create export + display cols) ---
+events_trunc <- Events_add %>%
+  select(USCID,`Event Code`, `Start Date`, `End Date`, `Event`,Unit ,Team) %>%
+  mutate(
+    # canonical date objects for filtering/logic
+    EventDateStart = as.Date(`Start Date`),
+    EventDateEnd   = as.Date(`End Date`),
+
+    # stable export columns (kept for internal/reference)
+    export_Start   = fmt_export(EventDateStart),
+    export_End     = fmt_export(EventDateEnd),
+
+    # presentation/display columns (no $ so they can be parsed back to Date)
+    display_Start  = fmt_display(EventDateStart, pad_day = TRUE),
+    display_End    = fmt_display(EventDateEnd, pad_day = TRUE),
+
+    across(where(is.character), ~str_trim(.x, side = "both"))
+  )
+
+
+# --- clean and robust category mapping + other cleaning ---
+Events_addCln <- events_trunc %>%
+  # broadened date window to avoid accidentally dropping events; narrow as needed
+  filter(`Start Date` >= first_day_last_month & `Start Date` <= last_day_last_month) %>%
+  mutate(
+    # normalized event title for consistent pattern checks
+    Event_norm = str_squish(str_trim(Event)),
+    Event_norm_lower = str_to_lower(Event_norm),
+
+    # canonical cleaned event name (no punctuation) for filenames
+    Event_RmPunct = str_remove_all(Event, "[^[:alnum:]\\s]"),
+
+    # standardize characters
+    across(where(is.character), str_trim),
+    # Robust Category mapping (case-insensitive, host-aware, normalized outputs)
+    Category = case_when(
+      # Host-based matches (Dance Marathon, Homecoming)
+      if_any(Team, ~ str_detect(str_trim(.x), regex("dance\\s*marathon", ignore_case = TRUE))) ~ "Dance_Marathon",
+      if_any(Team, ~ str_detect(str_trim(.x), 
+      regex("homecoming\\s*commission|homecoming", ignore_case = TRUE))) ~ "Homecoming",
+      #event based matches
+      str_detect(Event_norm, regex("^tiger\\s*burn", ignore_case = TRUE)) ~ "Tiger_Burn",
+      str_detect(Event_norm, regex(".*blood.*", ignore_case = TRUE)) ~ "Carolina_Clemson_Blood_Drive",
+      str_detect(Event_norm, regex("^service\\ssaturday", ignore_case = TRUE)) ~ "Service_Saturday",
+      str_detect(Event_norm, regex("^alternative\\s*break|^alternative.*Break.*", ignore_case = TRUE)) ~ "Alternative_Break",
+      str_detect(Event_norm, regex("^Live\\s*at|@\\s*the\\s*Underground", 
+                                   ignore_case= TRUE)) ~ "Live_at_the_Underground",
+      str_detect(Event_norm, regex("^MAPP.", ignore_case = TRUE)) ~ "MAPP",
+      str_detect(Event_norm, regex("cfelp|close\\s*family\\s*emerging", 
+                                   ignore_case = TRUE)) ~ "Close_Family_Emerging_Leaders_Program",
+      str_detect(Event_norm, regex("^t.*\\s*a.*\\s*d.*|^tad", 
+                                   ignore_case = TRUE)) ~ "Thursday_After_Dark",
+      str_detect(Event_norm, regex("^TT.|^Tuesday\\s*Takeover.", 
+                                   ignore_case = TRUE)) ~ "Tuesday_Takeover",
+      str_detect(Event_norm, regex("empower", ignore_case = TRUE)) ~ "EmpowerMENt",
+      # Big Teams
+      if_any(Team, ~ str_detect(str_trim(.x), 
+                                             regex("carolina\\s*productions", ignore_case = TRUE))) ~ "Carolina_Productions",
+      if_any(Team, ~ str_detect(str_trim(.x), 
+                                             regex("gamecock\\s*entertainment", ignore_case = TRUE))) ~ "Gamecock_Entertainment",
+      str_detect(Unit,"LSC")~ "Leadership and Service Center",
+      str_detect(Unit,"CSE")~ "Center for Student Experience",
+      str_detect(Unit,"GMG")~ "Gamecock Media Group",
+      # Fallback to Drop
+      TRUE ~ "Drop"
+    )) %>% 
+  filter(!is.na(USCID)) %>%
+  filter(!is.na(`Start Date`)) %>% 
+  # select just the columns you need downstream
+  select(Category, USCID, Event_RmPunct, export_Start, export_End, display_Start, display_End, EventDateStart, EventDateEnd) %>%
+  rename(
+    EVENT = Event_RmPunct,
+    `START DATE` = export_Start,
+    `END DATE` = export_End,
+    DISPLAY_START = display_Start,
+    DISPLAY_END = display_End)
+
+# Note: we keep true EventDateStart/EventDateEnd (Date objects) in the dataset for Excel export
+# If you prefer to drop the normalization columns, do so here.
+
+# clean up intermediate objects
+rm(attendees_add, Events_add, events_trunc, EventsAttnd, SL_FacStaff, tmp)
+
+# --- Grouping / splitting into named lists and export ---
+Dat_Group <- Events_addCln %>%
+  group_by(Category, EVENT, `START DATE`, `END DATE`)
+
+Group_names <- Dat_Group %>%
+  group_keys() %>%
+  mutate(Name_raw = paste(Category, EVENT, `START DATE`, sep = ""),
+         Name = str_replace_all(Name_raw, '[/\\s\\$\\:\\*\\?"<>|]', "")) %>%
+  pull(Name)
+
+named_list <- Dat_Group %>%
+  group_split() %>%
+  set_names(Group_names)
+
+# --- EXPORT: Use DISPLAY_START / DISPLAY_END in CSVs if user requested text output,
+# but use true Dates for Excel writing to keep formatting reliable. ---
+ExportList_exceltext <- map(named_list, ~ .x %>%
+  mutate(DISPLAY_START_EXCEL = paste0('="', DISPLAY_START, '"'),
+         DISPLAY_END_EXCEL   = paste0('="', DISPLAY_END, '"')) %>%
+  select(USCID, DISPLAY_START_EXCEL, DISPLAY_END_EXCEL) %>%
+  rename(`START DATE` = DISPLAY_START_EXCEL, `END DATE` = DISPLAY_END_EXCEL))
+
+# Write per-group Excel files (using true Date objects for the worksheet)
+for (nm in names(named_list)) {
+  df <- named_list[[nm]] %>%
+    # ensure true Date objects for writeData (use EventDateStart/EventDateEnd)
+    mutate(
+      START_DATE_FOR_XL = as.Date(EventDateStart, tryFormats = c("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y")),
+      END_DATE_FOR_XL   = as.Date(EventDateEnd, tryFormats = c("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y"))
+    ) %>%
+    select(USCID, START_DATE_FOR_XL, END_DATE_FOR_XL) %>%
+    rename(`START DATE` = START_DATE_FOR_XL, `END DATE` = END_DATE_FOR_XL)
+
+  wb <- createWorkbook()
+  addWorksheet(wb, "Sheet1")
+  writeData(wb, "Sheet1", df)
+
+  # Create style to show two-digit year
+  two_digit_style <- createStyle(numFmt = "mm/dd/yyyy")
+
+  # Apply style to START and END columns (col 2 and 3 here)
+  if (nrow(df) > 0) {
+    addStyle(wb, "Sheet1", style = two_digit_style, cols = 2, rows = 2:(nrow(df) + 1), gridExpand = TRUE)
+    addStyle(wb, "Sheet1", style = two_digit_style, cols = 3, rows = 2:(nrow(df) + 1), gridExpand = TRUE)
+  }
+
+  out_xlsx <- file.path(out_dir, paste0(nm, ".xlsx"))
+  saveWorkbook(wb, out_xlsx, overwrite = TRUE)
+}
+
+# Optional: write the text/CSV-style exports that preserve the textual display (if needed)
+# Example: write all ExportList_exceltext into a single multi-sheet workbook or individual CSVs.
+for (nm in names(ExportList_exceltext)) {
+  df_txt <- ExportList_exceltext[[nm]]
+  # write as CSV to preserve the '="...") trick for Excel textual display
+  out_csv <- file.path(out_dir, paste0(nm, "_text.csv"))
+  write_csv(df_txt, out_csv)
+}
+
+```
